@@ -1,2 +1,2 @@
 #!/bin/sh
-python3 /opt/scripts/rpi-touchscreen.py
+python3 /home/pi/rpi-touchscreen-mqtt/rpi-touchscreen.py

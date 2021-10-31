@@ -2,26 +2,14 @@
 import time
 import subprocess
 import paho.mqtt.client as mqtt
-import rpi_backlight as bl
 from urllib.request import urlopen
 from urllib.error import URLError
-from ft5406 import Touchscreen, TS_PRESS
-
-
-ts = Touchscreen()
-
-def touch_handler(event, touch):
-    if event == TS_PRESS:
-        bl.set_power(True)
-        bl.set_brightness(255)
-
-for touch in ts.touches:
-    touch.on_press = touch_handler
 
 subprocess.call("DISPLAY=:0 xset s off", shell=True)
 subprocess.call("DISPLAY=:0 xset -dpms", shell=True)
 
-ts.run()
+screenOn = True
+
 # Workaround
 def wait_for_internet_connection():
     while True:
@@ -38,6 +26,7 @@ def on_connect(client, userdata, flags, rc):
     else:
         print("Bad connection Returned code=",rc)
 
+screenOn = True
 
 def on_message(client, userdata, msg):
     payload = str(msg.payload.decode("utf-8"))
@@ -50,35 +39,32 @@ def on_message(client, userdata, msg):
         values = payload.split(',')
         state = values[0]
         if state == 'on':
-            bl.set_power(True)
+            screenOn = True
             subprocess.call("DISPLAY=:0 xscreensaver-command -deactivate", shell=True)
         else:
-            bl.set_power(False)
+            screenOn = False
             subprocess.call("DISPLAY=:0 xscreensaver-command -activate", shell=True)
-        if len(values) > 1:
-            if values[1] != "":
-                brightness = int(values[1])
-                bl.set_brightness(brightness)
         getStatus()
     elif topic == 'dashboard/rpi1/reload':
         subprocess.call("sudo killall kiosk.sh && sudo service lightdm restart", shell=True)
 
 def getStatus():
     topic = "dashboard/rpi1/status"
-    if bl.get_power():
+    if screenOn:
         state = 'on'
     else:
         state = 'off'
-    brightness = bl.get_actual_brightness()
+    brightness = 100
     payload = state+","+str(brightness)
     print("Publishing " + payload + " to topic: " + topic + " ...")
     client.publish(topic, payload, 0, True)
 
 wait_for_internet_connection()
 mqtt.Client.connected_flag=False#create flag in class
-broker="BROKER_URL"
+#broker="mqtt://homeassistant.local:1883"
+broker="homeassistant.local"
 client = mqtt.Client("dashboard")
-client.username_pw_set('MQTT_USER', 'MQTT_PASSWORD')            #create new instance
+client.username_pw_set('********', '**********')            #create new instance
 client.on_connect=on_connect  #bind call back function
 client.on_message=on_message
 client.loop_start()
